@@ -1,0 +1,32 @@
+GCC = g++
+GLINK = g++
+
+INCLUDE = -I/usr/local/include
+LIBDIR = -L/usr/local/lib
+LIB = -lgsl -lm -lgslcblas
+
+LIBPTHREAD = -lpthread
+INCLUDEPTHREAD = -I/usr/include
+LIBDIRPTHREAD = -L/usr/lib
+
+CCFLAGS = -O3 -DLINUX #-DDEBUG
+GCCFLAGS = -O3 -c -Wall -DLINUX #-DDEBUG
+DELAY = 20
+
+all:abelian_higgs_3D_MT_barrier.srl
+
+%.txt:%.srl #data_tf.dat
+	./$<
+
+%.srl:%.o
+	$(GLINK) -o $@ $< $(LIBDIRPTHREAD) $(LIBPTHREAD)
+
+%.o:%.cpp
+	$(GCC) $(GCCFLAGS) $< $(INCLUDEPTHREAD)
+
+clean:
+	rm -f *.srl *~ *.o *.txt
+
+veryclean:
+	rm -f *.srl *~ *.o *.txt *.dat
+ 

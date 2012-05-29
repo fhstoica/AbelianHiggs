@@ -1,0 +1,186 @@
+This project contains the source code needed for 
+simulating the formation and evolution of topological 
+defects for the Abelian Higgs model. See for example:
+
+http://www.physics.mcgill.ca/~guymoore/latt_lectures.pdf
+
+Since the model is 3-dimensional the defect are 
+string-like, and the boundary conditions are periodic; 
+a string that exits the box on the left re-enters it on 
+the right.  
+
+It is a multi-threaded simulation using barrier 
+syncronization and the number of threads can be specified 
+by the user via the NoOfThreads parameter. 
+Under Linux CPU affinity can also be specified, by 
+uncommenting the -DLINUX preprocessor option in the 
+Makefile_MT.
+
+The code contains two arrays, containing the values of the 
+fields at each lattice point at time T and T + \Delta T.
+Simulating the evolution can be reduced to two steps; 
+evolution and then syncronization. 
+
+During the evolution step the values of the fields at 
+T+\Delta T are computed from those of the fiedls at time T. 
+During the synchronization part, the values of the fields 
+are simply copied back, from T+\Delta T to T, and the process 
+is repeated.
+
+The simulation cube is split across the x-axis into a number 
+of slices equal to the number of threads. Each thread 
+processes one slice. As each thread writes data only on its 
+own slice (but reads across boundaries) there is no need for 
+locking, only for barrier syncronization. 
+
+There are also a number of tasks that are performed by the 
+main thread.
+They are:
+ - Writing out the field values. They are written out only 
+   once every 100 timesteps or so. It is user definable via 
+   the "reduction" parameter in the Constants.cpp file. 
+   The "grid_reduction" parameter specifies which points to 
+   write out. For very large lattices (say, 512^3) writing 
+   evey point on the lattice will take an excessive amount 
+   of space (and time). Specifying grid_reduction = 2 or even 4, 
+   will write out only the points whose coordinates divide 
+   exactly by grid_reduction, reducig the file size by a 
+   factor of 8 or even 64.
+ - Compute the total energy of the fields. (Can in priciple 
+   be multi-threaded, however the calculation is not done at 
+   every time step)
+ - Compute the constraint on the initial values (The Gauss 
+   condition, once satisfied during debugging, never to be 
+   touched again).
+
+The threads are created, run for "reduction" time steps, then 
+they terminate, allowing the main thread to perform its tasks. 
+Then the threads are created again, and the process is 
+repeated a number of times specified by the "frames_total" 
+parameter in Constants.cpp.
+
+To obtain some non-trivial results one needs a lattice at 
+least 64^3, about 100 time steps between the frames, and 
+about 50 frames. Also very important is the damping, specified 
+via the "H" parameter in Constant.cpp, with a typical value 
+of 0.4.
+ 
+The treads have user-specified CPU affinity, so that all the 
+threads can run on any CPU, or each thread can be forced
+to run on a single CPU. Affinity is set via the attribute 
+used when creating the threads, using the function:
+ 
+pthread_attr_setaffinity_np(&attr, cpu_set_size, &cpuset);
+
+Notice that this is Linux-specific (the _np at the end 
+stand for "non-portable"). We could have used: 
+
+pthread_setaffinity_np(p_thread[i], sizeof(cpu_set_t), &cpuset);
+
+However this function migrates the thread to the correct 
+CPU _after_ the thread has been created. Using the attr, 
+the thread is created directly on the correct CPU. This can 
+be an issue on multi-socket systems where migrating a thread 
+can involve copying large amounts of data over slower interconnects 
+than the FSB, but it is irrelevant when running on a single 
+multi-core CPU.
+
+The user can leave these two lines in the main() function:
+
+      CPU_ZERO(&cpuset);   
+      CPU_SET(i, &cpuset); 
+
+uncommented, and this will force each thread to run on a 
+single CPU. If doing so make sure that NoOfThreads is not 
+larger than the number of physical (logical?) cores available. 
+Commenting them out will allow any thread to run on any CPU.
+
+To build the program use:
+
+make -f Makefile_MT abelian_higgs_3D_MT_barrier.srl
+
+and then simply run it with:
+
+./abelian_higgs_3D_MT_barrier.srl
+
+The program compiles in Windows under MinGW, but the CPU
+affinity part of the code must be disabled; make sure that 
+the preprocessor option -DLINUX is commented out.
+
+Visualising the data:
+
+The data can be best viewed by rendering an isosurface. 
+This is done by the isosurface.cpp program, or the 
+isosurface_vertices.cpp. Both implement an original method
+of drawing an isosurface (which later I discovered that 
+somebody already thought about and call it the "Marching 
+Tetrahedra" method), but one of them renders the entire 
+surface while the second renders only the vertices of 
+the triangles. I found myself viewing mostly the vertices 
+only as this allows me to see through very dense networks
+of vortices. 
+In case anyone needs it, it was trivial to write an
+isosurface_wireframe.cpp version as well, but I seldom use 
+it. Moreover, it is not optimised at all, quite possible
+all lines are rendered twice (once for each tetrahedron 
+on each side of a given triangle).
+
+Both use the Mesa and GLUT libraries and work on Linux as 
+well as Windows (unmodified) via MinGW. 
+
+To visualize the vortices, first make sure that the size
+of the simulation box is specified correctly, for example:
+
+const GLint N_x = 64;
+
+This applies both when the simulations is run on a 64^3 
+box with grid_reduction = 1 and when run on a 128^3 box
+with grid_reduction = 2.
+
+Then compile the program, in Linux:
+
+make -f OpenGL_Makefile isosurface.srl
+
+or on Windows
+
+make -f OpenGL_Makefile_Win isosurface.srl
+
+You may need to edit the makefiles so that they point to the 
+correct directories containing the gl.h, glu.h and glut.h.
+Then use it as:
+
+./isosurface.srl <file> <zoom_factor> <threshold> <grid_reduction>
+
+For a 64^3 lattice a good zoom_factor is 0.2 (smaller for 
+larger latttices) and the threshold is always between 0 and 1. 
+The "grid_reduction" parameter must have the same value as 
+the one used in Constant.cpp:
+
+./isosurface.srl scalar040.txt 0.2 0.5 1
+
+Click on the window and move the mouse around to rotate
+the box. 
+
+It may happen that you'll see an empty box. 
+That is because some simulations end up with no vortices. 
+The periodic boundary conditions make the box a torus and 
+each vortex a closed loop. Only those vortices that have 
+non-trivial winding around the torus will survive to the end 
+of the simulation (Ok, I am digressing into topology here, 
+sorry). 
+In this case you can try to visualise an earlier frame or 
+rerun the simulation with different initial conditions. 
+That is done by the Python script GenerateInitialData.py. 
+Specify the correct size of the box in the script and then 
+run it specifying some number that will be used as the seed 
+for the random number generator:
+
+python GenerateInitialData.py 4793.9857397
+
+The lattice simulation above can make a pretty good benchmark 
+for processor speed on multi-threaded tasks. To test that, 
+specify a large number of time steps between the frames (say 5000), 
+and only one frame to generate. This way the process will not be 
+slowed down by disk access. 
+
+Happy hacking!
