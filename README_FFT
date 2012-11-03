@@ -1,0 +1,43 @@
+We are offering some additional control over the initial data with the
+addition of a small utility to compute the Fast Fourier Transfrom
+(FFT) of the (complex) data. More precisly, the source code for
+Freq_Filter_FFT_3D.cpp allows for the following:
+
+ - Choose a central frequency
+ - Choose a decay power
+ - Perform a 3D FFT on the data, suppressing the modes that are away
+ from the central frequency by the specified decay power.
+
+This allows the user to select the initial data that is either noisy,
+when all modes have the same power, or smooth, when the high frequency
+modes are suppressed. First compile the code:
+
+make -f FFT_Makefile Freq_Filter_FFT_3D.srl
+
+Then run it, for example like this:
+
+./Freq_Filter_FFT_3D.srl initial_data.dat initial_data_FFT.dat 0 2
+
+The fist two parameters are the input and output files, the third is
+the central frequency, and the last one is the decay power. 
+The higher frequency modes are damped by:
+
+1/pow(sqrt((k_x - c_f - 0.5)^2 + (k_y - c_f - 0.5)^2 + (k_z - c_f - 0.5)^2), decay_pow)
+
+The shift of 0.5 is used to avoid a division by zero.
+A decay power less than 2 will result in noisy data, while a power of
+5 or higher will result in very smooth initial data.
+
+To perform the actual transformation we are using the GNU Scientific
+Library (GSL):
+
+http://www.gnu.org/software/gsl/
+
+Make sure that in the FFT_Makefile you set the variable "GSL" to point
+to the location of your GSL installation. 
+
+As the GSL library provides only 1-dimensional FFT, we are using the
+fact that a 2D or a 3D FFT can be computed by performing a
+1-dimensional Fourier transform on each row and then each column 
+(for the 2D case), or 3 sets of N^2 1-dimensional Fourier transforms
+each, along the x, y and z-direction, for the 3D case.

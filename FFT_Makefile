@@ -1,0 +1,19 @@
+GCC = g++
+GLINK = g++
+GSL = /usr/local/
+INCLUDE = -I$(GSL)include
+LIBDIR =  -L$(GSL)lib
+LIB = -lgsl -lm -lgslcblas
+CCFLAGS = -O3 -Wall
+GCCFLAGS = -Wall -O3 -c
+
+all:Freq_Filter_FFT_3D.srl
+
+%.srl:%.o
+	$(GLINK) -o $@ $< $(LIBDIR) $(LIB)
+
+%.o:%.cpp
+	$(GCC) $(GCCFLAGS) $< $(INCLUDE)
+
+clean:
+	rm -f Freq_Filter_FFT_3D.srl
