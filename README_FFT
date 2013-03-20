@@ -41,3 +41,13 @@ fact that a 2D or a 3D FFT can be computed by performing a
 1-dimensional Fourier transform on each row and then each column 
 (for the 2D case), or 3 sets of N^2 1-dimensional Fourier transforms
 each, along the x, y and z-direction, for the 3D case.
+
+The visualize_initial_data.cpp utility is simply used to visualize the
+initial (or the Fourier transformed) data, and is again using OpenGL.
+It draws an isosurface, but it uses a far simpler algorithm than the
+Marching Tetrahedra. It simply finds the intersections of the
+isosurface with the edge of the cubes that form the lattice. We call
+this a "triad" algorithm, as for each point one only needs to consider
+the triad of segments connecting (i, j, k) with (i+1, j, k), 
+(i, j+1, k) and (i, j, k+1) to cover the entire lattice.
+ 

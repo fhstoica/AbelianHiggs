@@ -9,7 +9,7 @@
 #include <GL/glu.h>
 
 const GLint dim = 3;
-const GLint N_x = 32;
+const GLint N_x = 64;
 const GLint N_y = N_x;
 const GLint N_z = N_x;
 
@@ -417,10 +417,12 @@ void keyboard(unsigned char key, int x, int y){
 }
 
 void reshape(int w, int h){
+  //GLfloat ortho_factor = 10.0;
   glViewport(0, 0, (GLsizei) w, (GLsizei) h);
   glMatrixMode(GL_PROJECTION); /* Select the projection matrix */
   glLoadIdentity(); /* Initialize it */
   gluPerspective(30, (GLfloat)w/(GLfloat)h, 10.0, 50.0);
+  //glOrtho (-ortho_factor, ortho_factor, -ortho_factor*h/w, ortho_factor*h/w, -100.0, 100.0);
   glMatrixMode(GL_MODELVIEW);
 }
 

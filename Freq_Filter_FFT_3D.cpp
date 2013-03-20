@@ -32,8 +32,7 @@ int main (int argc, char* argv[]){
   int central_freq;
   
   if(argc < 4){
-    std::cout << "Usage: ./Freq_Filter_FFT_3D.srl ";
-    std::cout << "infile outfile central_freq power " << std::endl;
+    std::cout << "Usage: ./Freq_Filter_FFT_3D.srl <infile> <outfile> <central_freq> <power>" << std::endl;
     return(0);
   }
 

@@ -1,6 +1,6 @@
 #! /usr/bin/python
 
-grid_points     = 64
+grid_points = 64
 
 import sys
 import os
@@ -14,10 +14,12 @@ f  = open(OUTFILE , 'w')
 for a in range(grid_points) :
     for b in range(grid_points) :
         for c in range(grid_points) :
-            f.write(str(a)+' '+str(b)+' '+str(c)+' ' 
-                    +str("%1.4f" % (random.random() - 0.5))+' '
-                    +str("%1.4f" % (random.random() - 0.5))+'\n')
-            continue
-        continue
-    continue
+            f.write("%s %s %s %1.4f %1.4f %1.4f %1.4f %1.4f %1.4f\n" % (a, b, c,
+                                                                        (random.random()-0.5),
+                                                                        (random.random()-0.5),
+                                                                        (random.random()-0.5),
+                                                                        (random.random()-0.5),
+                                                                        (random.random()-0.5),
+                                                                        (random.random()-0.5))
+                    )
 f.close()

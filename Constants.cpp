@@ -1,8 +1,6 @@
 const int dim      = 3; //Number of space dimensions
-const int scal_dim = 1; /* Number of components of the 
+const int scal_dim = 2; /* Number of components of the 
 			   complex scalar field. */
-const int vec_dim  = 3;/* The number of space-like components of the gauge field */
-
 const unsigned int NoOfThreads = 4;//Make sure it is not larger than the number of CPUs when setting the affinity!
 
 const int N_x = 64;  //Number of intervals X-Axis. Easier if it is a power of 2
@@ -10,10 +8,10 @@ const int N_y = N_x; //Number of intervals Y-Axis. Easier if it is a power of 2
 const int N_z = N_x; //Number of intervals Z-Axis. Easier if it is a power of 2
 
 unsigned long int reduction = 100;/* Write out the data only once every "reduction" timesteps. */
-unsigned long int grid_reduction = 2; /*For very large lattices write out only one out 
+unsigned long int grid_reduction = 1; /*For very large lattices write out only one out 
 					of "grid_reduction" points along each direction */
 
-const unsigned long int frames_total = 50;
+const unsigned long int frames_total = 20;
 unsigned long int Steps = reduction*frames_total; //Total number of steps
 
 const float dt = 1.0e-2; //Time  Interval

@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string>
+#include <vector>
 #include <pthread.h>
 #include "Constants.cpp"
 
@@ -11,8 +12,8 @@ typedef struct {
   float phi[2][N_x][N_y][N_z];
   float vel[2][N_x][N_y][N_z]; /* Phi is complex and we track the 
 			    real and imaginary parts separately. */
-  float E[vec_dim][N_x][N_y][N_z];
-  float A[vec_dim][N_x][N_y][N_z]; /* The link variables are complex, but 
+  float E[dim][N_x][N_y][N_z];
+  float A[dim][N_x][N_y][N_z]; /* The link variables are complex, but 
 				 there is only one degree of freedom. */
 } Coords; 
 
@@ -33,24 +34,39 @@ inline void periodic_boundaries(int ix, int iy, int iz, int& corr_ix, int& corr_
   (iz < 0) ? (corr_iz = N_z+iz):((iz > N_z-1) ? (corr_iz = iz - N_z):corr_iz = iz);
 }
 
+void Tokenize(const std::string& str, std::vector<std::string>& tokens, const std::string& delimiters = " "){
+  std::string::size_type lastPos = str.find_first_not_of(delimiters, 0);
+  std::string::size_type pos     = str.find_first_of(delimiters, lastPos);
+  
+  while (std::string::npos != pos || std::string::npos != lastPos){
+    tokens.push_back(str.substr(lastPos, pos - lastPos));
+    lastPos = str.find_first_not_of(delimiters, pos);
+    pos = str.find_first_of(delimiters, lastPos);
+  }
+}
+
 inline void read_data(Coords& temp_pos){
-  int junk_ix, junk_iy, junk_iz;
+  int ix, iy, iz, counter;
   std::string infile("initial_data.dat");
+  std::string c_line;
+  std::vector<std::string> line_elem;
   std::ifstream fin;
   fin.open(infile.c_str());
   if (fin.is_open()){
-    for(int ix = 0; ix < N_x; ++ix){
-      for(int iy = 0; iy < N_y; ++iy){
-	for(int iz = 0; iz < N_z; ++iz){
-	  fin >> junk_ix;
-	  fin >> junk_iy;
-	  fin >> junk_iz;
-	  fin >> temp_pos.phi[0][ix][iy][iz];
-	  fin >> temp_pos.phi[1][ix][iy][iz];
-	  temp_pos.phi[0][ix][iy][iz] = scale_factor*temp_pos.phi[0][ix][iy][iz];
-	  temp_pos.phi[1][ix][iy][iz] = scale_factor*temp_pos.phi[1][ix][iy][iz];
+    counter = 0;
+    while(fin){
+      getline(fin, c_line);
+      Tokenize(c_line, line_elem);
+      if(dim + scal_dim <= line_elem.size()){
+	ix = atoi(line_elem[0].c_str());
+	iy = atoi(line_elem[1].c_str());
+	iz = atoi(line_elem[2].c_str());
+	for(int pos = dim; pos < dim + scal_dim; ++pos){
+	  temp_pos.phi[pos - dim][ix][iy][iz] = scale_factor*atof(line_elem[pos].c_str());
 	}
+	++counter;
       }
+      line_elem.clear();
     }
   }
   else{
@@ -58,6 +74,10 @@ inline void read_data(Coords& temp_pos){
     exit(-1);
   }
   fin.close();
+  if(counter < pow(N_x, 3)){
+    std::cerr << "Not enough data points in: " << infile << std::endl;
+    exit(-1);
+  }
 }
 
 void syncT1T2MT(void* thread_data){
@@ -71,7 +91,7 @@ void syncT1T2MT(void* thread_data){
 	  T1->phi[p][i][j][k] = T2->phi[p][i][j][k];
 	  T1->vel[p][i][j][k] = T2->vel[p][i][j][k];
 	}
-	for(int p = 0; p < vec_dim; ++p){
+	for(int p = 0; p < dim; ++p){
 	  T1->A[p][i][j][k] = T2->A[p][i][j][k];
 	  T1->E[p][i][j][k] = T2->E[p][i][j][k];
 	} 
@@ -81,94 +101,6 @@ void syncT1T2MT(void* thread_data){
 #ifdef DEBUG
   std::cout << "syncT1T2MT: low_x_Lim = " << low_x_Lim << " high_x_Lim " << high_x_Lim << std::endl;
 #endif
-}
-
-void* syncT1T2MT00(void* debug_data){ 
-  for(int i = 0; i < N_x/2; ++i){
-    for(int j = 0; j < N_y/2; ++j){
-      for(int k = 0; k < N_z; ++k){
-	for(int p = 0; p < 2; ++p){
-	  T1->phi[p][i][j][k] = T2->phi[p][i][j][k];
-	  T1->vel[p][i][j][k] = T2->vel[p][i][j][k];
-	}
-	for(int p = 0; p < vec_dim; ++p){
-	  T1->A[p][i][j][k] = T2->A[p][i][j][k];
-	  T1->E[p][i][j][k] = T2->E[p][i][j][k];
-	} 
-      }
-    }
-  }
-  int E00 = *((int*)debug_data);
-  if(Debug_ON){
-    printf("syncT1T2MT00 '%d'\n", E00);
-  }
-  pthread_exit(NULL);
-}
-
-void* syncT1T2MT01(void* debug_data){ 
-  for(int i = 0; i < N_x/2; ++i){
-    for(int j = N_y/2; j < N_y; ++j){
-      for(int k = 0; k < N_z; ++k){
-	for(int p = 0; p < 2; ++p){
-	  T1->phi[p][i][j][k] = T2->phi[p][i][j][k];
-	  T1->vel[p][i][j][k] = T2->vel[p][i][j][k];
-	}
-	for(int p = 0; p < vec_dim; ++p){
-	  T1->A[p][i][j][k] = T2->A[p][i][j][k];
-	  T1->E[p][i][j][k] = T2->E[p][i][j][k];
-	} 
-      }
-    }
-  }
-  int E01 = *((int*)debug_data);
-  if(Debug_ON){
-    printf("syncT1T2MT01 '%d'\n", E01);
-  }
-  pthread_exit(NULL);
-}
-
-void* syncT1T2MT10(void* debug_data){ 
-  for(int i = N_x/2; i < N_x; ++i){
-    for(int j = 0; j < N_y/2; ++j){
-      for(int k = 0; k < N_z; ++k){
-	for(int p = 0; p < 2; ++p){
-	  T1->phi[p][i][j][k] = T2->phi[p][i][j][k];
-	  T1->vel[p][i][j][k] = T2->vel[p][i][j][k];
-	}
-	for(int p = 0; p < vec_dim; ++p){
-	  T1->A[p][i][j][k] = T2->A[p][i][j][k];
-	  T1->E[p][i][j][k] = T2->E[p][i][j][k];
-	} 
-      }
-    }
-  }
-  int E10 = *((int*)debug_data);
-  if(Debug_ON){
-    printf("syncT1T2MT10 '%d'\n", E10);
-  }
-  pthread_exit(NULL);
-}
-
-void* syncT1T2MT11(void* debug_data){ 
-  for(int i = N_x/2; i < N_x; ++i){
-    for(int j = N_y/2; j < N_y; ++j){
-      for(int k = 0; k < N_z; ++k){
-	for(int p = 0; p < 2; ++p){
-	  T1->phi[p][i][j][k] = T2->phi[p][i][j][k];
-	  T1->vel[p][i][j][k] = T2->vel[p][i][j][k];
-	}
-	for(int p = 0; p < vec_dim; ++p){
-	  T1->A[p][i][j][k] = T2->A[p][i][j][k];
-	  T1->E[p][i][j][k] = T2->E[p][i][j][k];
-	} 
-      }
-    }
-  }
-  int E11 = *((int*)debug_data);
-  if(Debug_ON){
-    printf("syncT1T2MT11 '%d'\n", E11);
-  }
-  pthread_exit(NULL);
 }
 
 inline float PlaqX1(Coords& Curr_pos, int ix, int iy, int iz){
@@ -760,147 +692,6 @@ void* EvolveMT(void* thread_data){
 #endif
 }
 
-
-void* Evolve00(void* debug_data){
-
-  for(int ix = 0; ix < N_x/2; ++ix){
-    for(int iy = 0; iy < N_y/2; ++iy){
-      for(int iz = 0; iz < N_z; ++iz){//Start looping 
-		
-	UpdateScalarVelReal(*T2, *T1, ix, iy, iz);
-	UpdateScalarVelImag(*T2, *T1, ix, iy, iz);
-	
-	UpdateEFieldX(*T2, *T1, ix, iy, iz);
-	UpdateEFieldY(*T2, *T1, ix, iy, iz);
-	UpdateEFieldZ(*T2, *T1, ix, iy, iz);
-      }
-    }
-  }
-  for(int ix = 0; ix < N_x/2; ++ix){
-    for(int iy = 0; iy < N_y/2; ++iy){
-      for(int iz = 0; iz < N_z; ++iz){//Start looping 
-	
-	UpdateScalarReal(*T2, *T1, ix, iy, iz);
-	UpdateScalarImag(*T2, *T1, ix, iy, iz);
-
-	UpdateLinkX(*T2, *T1, ix, iy, iz);
-	UpdateLinkY(*T2, *T1, ix, iy, iz);
-	UpdateLinkZ(*T2, *T1, ix, iy, iz);
-      }
-    }
-  }
-  int E00 = *((int*)debug_data);
-  if(Debug_ON){
-    printf("Evolve00 '%d'\n", E00);
-  }
-  pthread_exit(NULL);
-}
-
-void* Evolve01(void* debug_data){
-
-  for(int ix = N_x/2; ix < N_x; ++ix){
-    for(int iy = 0; iy < N_y/2; ++iy){
-      for(int iz = 0; iz < N_z; ++iz){//Start looping 
-		
-	UpdateScalarVelReal(*T2, *T1, ix, iy, iz);
-	UpdateScalarVelImag(*T2, *T1, ix, iy, iz);
-	
-	UpdateEFieldX(*T2, *T1, ix, iy, iz);
-	UpdateEFieldY(*T2, *T1, ix, iy, iz);
-	UpdateEFieldZ(*T2, *T1, ix, iy, iz);
-      }
-    }
-  }
-  for(int ix = N_x/2; ix < N_x; ++ix){
-    for(int iy = 0; iy < N_y/2; ++iy){
-      for(int iz = 0; iz < N_z; ++iz){//Start looping 
-	
-	UpdateScalarReal(*T2, *T1, ix, iy, iz);
-	UpdateScalarImag(*T2, *T1, ix, iy, iz);
-
-	UpdateLinkX(*T2, *T1, ix, iy, iz);
-	UpdateLinkY(*T2, *T1, ix, iy, iz);
-	UpdateLinkZ(*T2, *T1, ix, iy, iz);
-      }
-    }
-  }
-  int E01 = *((int*)debug_data);
-  if(Debug_ON){
-    printf("Evolve01 '%d'\n", E01);
-  }
-  pthread_exit(NULL);
-}
-
-void* Evolve10(void* debug_data){
-
-  for(int ix = 0; ix < N_x/2; ++ix){
-    for(int iy = N_y/2; iy < N_y; ++iy){
-      for(int iz = 0; iz < N_z; ++iz){//Start looping 
-		
-	UpdateScalarVelReal(*T2, *T1, ix, iy, iz);
-	UpdateScalarVelImag(*T2, *T1, ix, iy, iz);
-	
-	UpdateEFieldX(*T2, *T1, ix, iy, iz);
-	UpdateEFieldY(*T2, *T1, ix, iy, iz);
-	UpdateEFieldZ(*T2, *T1, ix, iy, iz);
-      }
-    }
-  }
-  for(int ix = 0; ix < N_x/2; ++ix){
-    for(int iy = N_y/2; iy < N_y; ++iy){
-      for(int iz = 0; iz < N_z; ++iz){//Start looping 
-	
-	UpdateScalarReal(*T2, *T1, ix, iy, iz);
-	UpdateScalarImag(*T2, *T1, ix, iy, iz);
-
-	UpdateLinkX(*T2, *T1, ix, iy, iz);
-	UpdateLinkY(*T2, *T1, ix, iy, iz);
-	UpdateLinkZ(*T2, *T1, ix, iy, iz);
-      }
-    }
-  }
-  int E10 = *((int*)debug_data);
-  if(Debug_ON){
-    printf("Evolve10 '%d'\n", E10);
-  }
-  pthread_exit(NULL);
-}
-
-void* Evolve11(void* debug_data){
-
-  for(int ix = N_x/2; ix < N_x; ++ix){
-    for(int iy = N_y/2; iy < N_y; ++iy){
-      for(int iz = 0; iz < N_z; ++iz){//Start looping 
-		
-	UpdateScalarVelReal(*T2, *T1, ix, iy, iz);
-	UpdateScalarVelImag(*T2, *T1, ix, iy, iz);
-	
-	UpdateEFieldX(*T2, *T1, ix, iy, iz);
-	UpdateEFieldY(*T2, *T1, ix, iy, iz);
-	UpdateEFieldZ(*T2, *T1, ix, iy, iz);
-      }
-    }
-  }
-  for(int ix = N_x/2; ix < N_x; ++ix){
-    for(int iy = N_y/2; iy < N_y; ++iy){
-      for(int iz = 0; iz < N_z; ++iz){//Start looping 
-	
-	UpdateScalarReal(*T2, *T1, ix, iy, iz);
-	UpdateScalarImag(*T2, *T1, ix, iy, iz);
-
-	UpdateLinkX(*T2, *T1, ix, iy, iz);
-	UpdateLinkY(*T2, *T1, ix, iy, iz);
-	UpdateLinkZ(*T2, *T1, ix, iy, iz);
-      }
-    }
-  }
-  int E11 = *((int*)debug_data);
-  if(Debug_ON){
-    printf("Evolve11 '%d'\n", E11);
-  }
-  pthread_exit(NULL);
-}
-
 inline void Check_Gauss(Coords& Curr_pos, unsigned int& local_frame){
   int c_ix, c_iy, c_iz;
   float temp_x, temp_y, temp_z, temp_scal, temp_gauss;
@@ -1101,7 +892,7 @@ inline void reset_coords(Coords& curr_pos){
 	  curr_pos.phi[p][i][j][k] = 0;
 	  curr_pos.vel[p][i][j][k] = 0;
 	}
-	for(int p = 0; p < vec_dim; ++p){
+	for(int p = 0; p < dim; ++p){
 	  curr_pos.A[p][i][j][k] = 0; 
 	  curr_pos.E[p][i][j][k] = 0; 
 	}
@@ -1118,7 +909,7 @@ inline void sync_coords(Coords& new_pos, Coords& old_pos){
 	  new_pos.phi[p][i][j][k] = old_pos.phi[p][i][j][k];
 	  new_pos.vel[p][i][j][k] = old_pos.vel[p][i][j][k];
 	}
-	for(int p = 0; p < vec_dim; ++p){
+	for(int p = 0; p < dim; ++p){
 	  new_pos.A[p][i][j][k] = old_pos.A[p][i][j][k];
 	  new_pos.E[p][i][j][k] = old_pos.E[p][i][j][k];
 	} 
@@ -1181,10 +972,10 @@ void writeLinks(unsigned int& local_frame){
       for(int iz = 0; iz < N_z; ++iz){
 	if((ix%grid_reduction == 0)&&(iy%grid_reduction == 0)&&(iz%grid_reduction == 0)){
 	  link_out << ix << " " << iy << " " << iz << " " ;
-	  for(int p = 0; p < vec_dim; ++p){
+	  for(int p = 0; p < dim; ++p){
 	    link_out << T1->A[p][iz][iy][iz] << " ";
 	  }
-	  for(int p = 0; p < vec_dim; ++p){
+	  for(int p = 0; p < dim; ++p){
 	    link_out << T1->E[p][ix][iy][iz] << " ";
 	  }
 	  link_out << std::endl; 
